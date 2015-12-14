@@ -6,13 +6,16 @@
  * Time: 0:34
  */
 
+$time_start = microtime(true);
+
+
 error_reporting(E_ERROR);
 require_once("paradox.inc");
 
-$db = new SQLite3('base.sqlite');
+
 
 function createdb_schema($name, $fields) {
-	$query = "CREATE TABLE `{$name}` (";
+	$query = "CREATE TABLE IF NOT EXISTS `{$name}` (";
 	$types = array(
 		1  => array(
 			'px'     => 'PX_FIELD_ALPHA',
@@ -94,19 +97,21 @@ function brackets($txt) {
 }
 
 function ConvertDB($fname) {
-	global $db;
+//	echo "=> {$fname}\n";
 	if (!file_exists($fname)) exit(10);
+	$db = new SQLite3('base.sqlite');
+	$db->exec("pragma synchronous = off;");
 	$tablename = pathinfo($fname, PATHINFO_FILENAME);
-	$db->query('DELETE FROM '.$tablename);
 	$pdx = new Paradox();
 	$pdx->Open($fname);
+	$db->exec(createdb_schema($tablename,$pdx->GetSchema()));
+	$db->exec('DELETE FROM '.$tablename);
 	if ($records = $pdx->GetNumRows()) {
 		$schema = $pdx->GetSchema();
-		print_r($schema);
+//		print_r($schema);
 		for ($rec = 0; $rec < $records; $rec++) {
 			$pdx->GetRow($rec);
-//			if ($rec > 10) break;
-//			$db_fields = '(`' . implode('`, `', array_keys($pdx->row)) . '`)';
+//			if ($rec > 2) break;
 			$query = 'INSERT INTO `' . $tablename . '` VALUES (';
 			$values = '';
 			foreach ($pdx->row as $fieldName => $value) {
@@ -117,25 +122,32 @@ function ConvertDB($fname) {
 					case 2:
 						$value = brackets($pdx->GetStringfromDate($value));
 						break;
+					case 21:
+						$value = brackets($pdx->GetStringfromTimestamp($value));
+						break;
 					case 4:
 						$value = (int)$value;
+						break;
+					case 6:
+						$value = (float)$value;
 						break;
 					case 9:
 						$value = (int)$value;
 						break;
 					case 13:
-						$value = brackets(bin2hex($value));
+						$value = "X".brackets(bin2hex($value));
 						break;
 					default:
-						echo "";
+						$value;
 						break;
 				}
 				$values .= $value . ', ';
-				//print "{$schema[$fieldname]['type']}\t{$fieldname}\t{$value}\n";
+//				print "{$schema[$fieldName]['type']}\t{$fieldName}\t{$value}\n";
 			}
 			$values = rtrim($values, ', ');
-			$query .= $values . ');';
-			$db->query($query);
+			$query .= $values . ");\n";
+//			print trim($query).PHP_EOL;
+			$db->exec($query);
 		}
 		return true;
 	}
@@ -143,15 +155,22 @@ function ConvertDB($fname) {
 
 }
 
-//ConvertDB('db/Card.DB');
+//ConvertDB('db/LogRegCard.DB');
 
-$files = [];
+$curfile = '';
+if (1) {
 foreach (glob("db/*.DB") as $file) {
-	echo "$file\n";
+    $dbstime = microtime(true);
 	ConvertDB($file);
+	$dbtime = microtime(true) - $dbstime;
+	echo "=> {$file} {$dbtime} секунд\n";
+}
 }
 
 
+$time_end = microtime(true);
+$time = $time_end - $time_start;
 
+echo "Всего $time секунд\n";
 
 

@@ -74,7 +74,7 @@ $types = [
 ];
 
 $pdx = new Paradox();
-$pdx->m_default_field_value = "?";//" "; 
+$pdx->field_default_value = "?";//" ";
 
 //if ($pdx->Open("LogAutoCash.DB")) {
 if ($pdx->Open("db/Card.DB")) {
